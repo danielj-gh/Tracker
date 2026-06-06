@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>Track</title>
+<style>
+  /* ── RESET & BASE ─────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0a0a;
+    --surface:   #141414;
+    --border:    #2a2a2a;
+    --dim:       #444;
+    --text:      #e8e8e8;
+    --muted:     #666;
+    --push:      #e8c84a;
+    --diet:      #4ace82;
+    --both:      #4aa8e8;
+    --font-mono: 'Courier New', Courier, monospace;
+    --font-disp: Georgia, 'Times New Roman', serif;
+  }
+
+  html, body {
+    height: 100%; width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  /* ── LAYOUT ───────────────────────────────────── */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* ── HEADER ───────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 18px 20px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  header h1 {
+    font-family: var(--font-disp);
+    font-size: 22px;
+    font-weight: normal;
+    letter-spacing: 0.04em;
+  }
+
+  header .date-display {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── NOTIFICATION BANNER ──────────────────────── */
+  #notif-banner {
+    padding: 10px 20px;
+    background: #0d1220;
+    border-bottom: 1px solid #1a2540;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 11px;
+    color: #7090c0;
+    letter-spacing: 0.05em;
+  }
+
+  #notif-banner.hidden { display: none; }
+
+  #notif-banner .notif-text { flex: 1; }
+
+  #notif-enable-btn {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--both);
+    background: #0d1a2a;
+    border: 1px solid #1a3050;
+    border-radius: 3px;
+    padding: 5px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  #notif-dismiss {
+    color: var(--dim);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+  }
+
+  /* ── ACTION PANEL ─────────────────────────────── */
+  #actions {
+    padding: 28px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .action-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  /* ── BIG BUTTONS ──────────────────────────────── */
+  .log-btn {
+    flex: 1;
+    padding: 18px 16px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .log-btn:active { transform: scale(0.97); }
+
+  .log-btn .btn-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .log-btn .btn-value {
+    font-family: var(--font-disp);
+    font-size: 28px;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .log-btn .btn-sub {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  #btn-push { border-color: #2a2500; }
+  #btn-push:hover, #btn-push.done { border-color: var(--push); background: #1a1500; }
+  #btn-push.done .btn-value { color: var(--push); }
+  #btn-push.done .btn-label { color: var(--push); }
+
+  #btn-diet { border-color: #002a14; }
+  #btn-diet:hover, #btn-diet.done { border-color: var(--diet); background: #001a0d; }
+  #btn-diet.done .btn-value { color: var(--diet); }
+  #btn-diet.done .btn-label { color: var(--diet); }
+
+  .log-btn::after {
+    content: '✓ LOGGED';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    font-weight: bold;
+    opacity: 0;
+    background: rgba(0,0,0,0.6);
+    transition: opacity 0.1s;
+    pointer-events: none;
+  }
+  .log-btn.flashing::after { opacity: 1; }
+
+  /* ── PUSH-UP COUNTER ─────────────────────────── */
+  #push-control {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 64px;
+  }
+
+  .counter-arrow {
+    width: 48px; height: 36px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--dim);
+    font-size: 18px;
+    transition: color 0.1s, border-color 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .counter-arrow:active { color: var(--push); border-color: var(--push); }
+
+  #counter-display {
+    width: 48px; height: 52px;
+    background: #0f0f0f;
+    border-left: 1.5px solid var(--border);
+    border-right: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-disp);
+    font-size: 26px;
+    color: var(--push);
+    cursor: ns-resize;
+    touch-action: none;
+  }
+
+  /* ── STATUS BAR ───────────────────────────────── */
+  #status-bar {
+    padding: 10px 20px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--border);
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .status-pill {
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .pill-push { background: #1a1500; color: var(--push); border: 1px solid #3a3000; }
+  .pill-diet { background: #001a0d; color: var(--diet); border: 1px solid #003020; }
+  .pill-none { color: var(--dim); }
+
+  /* Notification status dot in status bar */
+  #notif-status {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .notif-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--dim);
+  }
+  .notif-dot.on { background: var(--diet); }
+
+  /* ── CALENDAR HEATMAP ────────────────────────── */
+  #calendar-section {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .section-title {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .month-block { margin-bottom: 28px; }
+
+  .month-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 8px;
+  }
+
+  .dow-labels {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    margin-bottom: 4px;
+  }
+
+  .dow-label {
+    text-align: center;
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 0.05em;
+  }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+
+  .cal-day {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--dim);
+    position: relative;
+    cursor: default;
+  }
+
+  .cal-day.empty { background: transparent; border-color: transparent; }
+  .cal-day.today { border-color: var(--muted); color: var(--text); }
+  .cal-day.has-push { background: #1a1500; border-color: #3a3000; }
+  .cal-day.has-diet { background: #001a0d; border-color: #003020; }
+  .cal-day.has-both { background: #0d1a14; border-color: var(--both); }
+
+  .cal-day .dots {
+    position: absolute;
+    bottom: 2px;
+    display: flex;
+    gap: 2px;
+  }
+  .dot { width: 3px; height: 3px; border-radius: 50%; }
+  .dot-push { background: var(--push); }
+  .dot-diet { background: var(--diet); }
+
+  /* ── LEGEND ───────────────────────────────────── */
+  .legend {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .legend-swatch {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+  }
+
+  /* ── FOOTER ───────────────────────────────────── */
+  #footer {
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  .text-btn {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 0;
+    transition: color 0.1s;
+  }
+  .text-btn:hover { color: var(--text); }
+
+  #calendar-section::-webkit-scrollbar { width: 4px; }
+  #calendar-section::-webkit-scrollbar-track { background: transparent; }
+  #calendar-section::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <header>
+    <h1>Track</h1>
+    <span class="date-display" id="header-date"></span>
+  </header>
+
+  <!-- NOTIFICATION PERMISSION BANNER (shown once if not yet granted) -->
+  <div id="notif-banner" class="hidden">
+    <span class="notif-text">Enable 10pm daily reminder?</span>
+    <button id="notif-enable-btn" onclick="requestNotifPermission()">Enable</button>
+    <button id="notif-dismiss" onclick="dismissNotifBanner()" title="Dismiss">✕</button>
+  </div>
+
+  <!-- ACTION PANEL -->
+  <div id="actions">
+
+    <!-- Push-ups row -->
+    <div class="action-row">
+      <button class="log-btn" id="btn-push" onclick="logPushups()">
+        <span class="btn-label">Push-ups</span>
+        <span class="btn-value" id="btn-push-val">10</span>
+        <span class="btn-sub">tap to record</span>
+      </button>
+
+      <div id="push-control">
+        <div class="counter-arrow"
+             ontouchstart="startRepeat(1)"  ontouchend="stopRepeat()"
+             onmousedown="startRepeat(1)"   onmouseup="stopRepeat()" onmouseleave="stopRepeat()">▲</div>
+        <div id="counter-display"
+             ontouchstart="onTouchStart(event)"
+             ontouchmove="onTouchMove(event)"
+             ontouchend="onTouchEnd(event)">10</div>
+        <div class="counter-arrow"
+             ontouchstart="startRepeat(-1)" ontouchend="stopRepeat()"
+             onmousedown="startRepeat(-1)"  onmouseup="stopRepeat()" onmouseleave="stopRepeat()">▼</div>
+      </div>
+    </div>
+
+    <!-- Diet row -->
+    <div class="action-row">
+      <button class="log-btn" id="btn-diet" onclick="logDiet()">
+        <span class="btn-label">Diet</span>
+        <span class="btn-value" id="btn-diet-val">Good day</span>
+        <span class="btn-sub">tap to record</span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- STATUS BAR -->
+  <div id="status-bar">
+    <span id="status-text" class="pill-none">Nothing logged today</span>
+    <span id="notif-status">
+      <span class="notif-dot" id="notif-dot"></span>
+      <span id="notif-label">10pm off</span>
+    </span>
+  </div>
+
+  <!-- CALENDAR HEATMAP -->
+  <div id="calendar-section">
+    <div class="section-title">History</div>
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:#3a3000;border:1px solid var(--push)"></div>Push-ups
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:#003020;border:1px solid var(--diet)"></div>Diet
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:#0d1a14;border:1px solid var(--both)"></div>Both
+      </div>
+    </div>
+    <div id="cal-container"></div>
+  </div>
+
+  <!-- FOOTER -->
+  <div id="footer">
+    <button class="text-btn" onclick="exportCSV()">Export CSV</button>
+    <button class="text-btn" onclick="clearConfirm()">Clear data</button>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  DATA LAYER
+//  Schema: { "YYYY-MM-DD": { pushups: number|null, goodDiet: bool } }
+// ═══════════════════════════════════════════════════
+
+const STORE_KEY = 'track_v1';
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveData(data) {
+  localStorage.setItem(STORE_KEY, JSON.stringify(data));
+}
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function getOrCreateToday(data) {
+  const k = todayKey();
+  if (!data[k]) data[k] = { pushups: null, goodDiet: false };
+  return data[k];
+}
+
+// ═══════════════════════════════════════════════════
+//  COUNTER  (0–30, default 10)
+// ═══════════════════════════════════════════════════
+
+const MIN = 0, MAX = 30;
+let counterVal = 10;
+let repeatTimer = null;
+let touchStartY = null;
+
+function setCounter(v) {
+  counterVal = Math.min(MAX, Math.max(MIN, v));
+  document.getElementById('counter-display').textContent = counterVal;
+  document.getElementById('btn-push-val').textContent = counterVal;
+}
+
+function startRepeat(dir) {
+  setCounter(counterVal + dir);
+  repeatTimer = setInterval(() => setCounter(counterVal + dir), 120);
+}
+
+function stopRepeat() {
+  clearInterval(repeatTimer);
+  repeatTimer = null;
+}
+
+function onTouchStart(e) {
+  e.preventDefault();
+  touchStartY = e.touches[0].clientY;
+}
+function onTouchMove(e) {
+  e.preventDefault();
+  const dy = touchStartY - e.touches[0].clientY;
+  if (Math.abs(dy) > 12) {
+    setCounter(counterVal + (dy > 0 ? 1 : -1));
+    touchStartY = e.touches[0].clientY;
+  }
+}
+function onTouchEnd(e) { touchStartY = null; }
+
+// ═══════════════════════════════════════════════════
+//  LOGGING
+// ═══════════════════════════════════════════════════
+
+function logPushups() {
+  const data = loadData();
+  const rec  = getOrCreateToday(data);
+  rec.pushups = counterVal;
+  saveData(data);
+  flash('btn-push');
+  refreshUI();
+}
+
+function logDiet() {
+  const data = loadData();
+  const rec  = getOrCreateToday(data);
+  rec.goodDiet = true;
+  saveData(data);
+  flash('btn-diet');
+  refreshUI();
+}
+
+function flash(id) {
+  const el = document.getElementById(id);
+  el.classList.add('flashing');
+  setTimeout(() => el.classList.remove('flashing'), 700);
+}
+
+// ═══════════════════════════════════════════════════
+//  NOTIFICATIONS
+// ═══════════════════════════════════════════════════
+
+const NOTIF_DISMISSED_KEY = 'track_notif_dismissed';
+
+function updateNotifStatusUI() {
+  const granted = Notification.permission === 'granted';
+  const dot     = document.getElementById('notif-dot');
+  const label   = document.getElementById('notif-label');
+  dot.classList.toggle('on', granted);
+  label.textContent = granted ? '10pm on' : '10pm off';
+}
+
+function showNotifBannerIfNeeded() {
+  if (!('Notification' in window)) return;           // not supported
+  if (Notification.permission === 'granted') return; // already on
+  if (Notification.permission === 'denied')  return; // user hard-blocked
+  const dismissed = localStorage.getItem(NOTIF_DISMISSED_KEY);
+  if (dismissed) return;                             // user dismissed banner
+  document.getElementById('notif-banner').classList.remove('hidden');
+}
+
+function dismissNotifBanner() {
+  localStorage.setItem(NOTIF_DISMISSED_KEY, '1');
+  document.getElementById('notif-banner').classList.add('hidden');
+}
+
+async function requestNotifPermission() {
+  if (!('Notification' in window)) {
+    alert('Notifications not supported in this browser.');
+    return;
+  }
+  const result = await Notification.requestPermission();
+  document.getElementById('notif-banner').classList.add('hidden');
+  updateNotifStatusUI();
+  if (result === 'granted') {
+    scheduleViaServiceWorker();
+  }
+}
+
+// Tell the service worker to start its internal alarm loop
+function scheduleViaServiceWorker() {
+  if (!navigator.serviceWorker?.controller) return;
+  navigator.serviceWorker.controller.postMessage({ type: 'SCHEDULE_ALARM' });
+}
+
+// ═══════════════════════════════════════════════════
+//  SERVICE WORKER REGISTRATION
+// ═══════════════════════════════════════════════════
+
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+
+    // Once SW is active, schedule alarm if permission already granted
+    navigator.serviceWorker.ready.then(() => {
+      if (Notification.permission === 'granted') {
+        scheduleViaServiceWorker();
+      }
+    });
+
+    // Listen for messages from SW
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data?.type === 'ALARM_SCHEDULED') {
+        const mins = Math.round(event.data.msUntil / 60000);
+        console.log(`[Track] 10pm alarm scheduled (${mins} min from now)`);
+      }
+    });
+
+  } catch (err) {
+    console.warn('[Track] SW registration failed:', err);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  UI REFRESH
+// ═══════════════════════════════════════════════════
+
+function refreshUI() {
+  const data  = loadData();
+  const today = data[todayKey()] || {};
+
+  // Header date
+  document.getElementById('header-date').textContent =
+    new Date().toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }).toUpperCase();
+
+  // Button done states
+  const pushDone = today.pushups != null;
+  const dietDone = today.goodDiet === true;
+
+  document.getElementById('btn-push').classList.toggle('done', pushDone);
+  document.getElementById('btn-diet').classList.toggle('done', dietDone);
+
+  document.getElementById('btn-push').querySelector('.btn-sub').textContent =
+    pushDone ? 'logged ✓' : 'tap to record';
+  document.getElementById('btn-diet').querySelector('.btn-sub').textContent =
+    dietDone ? 'logged ✓' : 'tap to record';
+
+  if (pushDone) {
+    document.getElementById('btn-push-val').textContent = today.pushups;
+    setCounter(today.pushups);
+  }
+
+  // Status pill
+  const statusEl = document.getElementById('status-text');
+  if (pushDone && dietDone) {
+    statusEl.className = 'status-pill';
+    statusEl.style.cssText = 'background:#0d1a14;color:var(--both);border:1px solid var(--both)';
+    statusEl.textContent = `${today.pushups} push-ups · good diet`;
+  } else if (pushDone) {
+    statusEl.className = 'status-pill pill-push';
+    statusEl.style.cssText = '';
+    statusEl.textContent = `${today.pushups} push-ups logged`;
+  } else if (dietDone) {
+    statusEl.className = 'status-pill pill-diet';
+    statusEl.style.cssText = '';
+    statusEl.textContent = 'Good diet logged';
+  } else {
+    statusEl.className = 'pill-none';
+    statusEl.style.cssText = '';
+    statusEl.textContent = 'Nothing logged today';
+  }
+
+  updateNotifStatusUI();
+  renderCalendar(data);
+}
+
+// ═══════════════════════════════════════════════════
+//  CALENDAR HEATMAP — last 6 months
+// ═══════════════════════════════════════════════════
+
+function renderCalendar(data) {
+  const container = document.getElementById('cal-container');
+  container.innerHTML = '';
+
+  const today  = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth() });
+  }
+
+  const DOW = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+  months.forEach(({ year, month }) => {
+    const block = document.createElement('div');
+    block.className = 'month-block';
+
+    const label = document.createElement('div');
+    label.className = 'month-label';
+    label.textContent = new Date(year, month, 1)
+      .toLocaleDateString('en-GB', { month:'long', year:'numeric' }).toUpperCase();
+    block.appendChild(label);
+
+    const dowRow = document.createElement('div');
+    dowRow.className = 'dow-labels';
+    DOW.forEach(day => {
+      const span = document.createElement('div');
+      span.className = 'dow-label';
+      span.textContent = day;
+      dowRow.appendChild(span);
+    });
+    block.appendChild(dowRow);
+
+    const grid = document.createElement('div');
+    grid.className = 'cal-grid';
+
+    const firstDay    = new Date(year, month, 1);
+    const startOffset = (firstDay.getDay() + 6) % 7; // Monday-first
+
+    for (let e = 0; e < startOffset; e++) {
+      const empty = document.createElement('div');
+      empty.className = 'cal-day empty';
+      grid.appendChild(empty);
+    }
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const todayStr    = todayKey();
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const rec     = data[dateStr] || {};
+      const cell    = document.createElement('div');
+      cell.className = 'cal-day';
+      cell.textContent = d;
+
+      if (dateStr === todayStr)  cell.classList.add('today');
+      if (rec.pushups != null)   cell.classList.add('has-push');
+      if (rec.goodDiet)          cell.classList.add('has-diet');
+      if (rec.pushups != null && rec.goodDiet) {
+        cell.classList.remove('has-push', 'has-diet');
+        cell.classList.add('has-both');
+      }
+
+      if (rec.pushups != null || rec.goodDiet) {
+        const dots = document.createElement('div');
+        dots.className = 'dots';
+        if (rec.pushups != null) {
+          const dot = document.createElement('div');
+          dot.className = 'dot dot-push';
+          dots.appendChild(dot);
+        }
+        if (rec.goodDiet) {
+          const dot = document.createElement('div');
+          dot.className = 'dot dot-diet';
+          dots.appendChild(dot);
+        }
+        cell.appendChild(dots);
+      }
+
+      grid.appendChild(cell);
+    }
+
+    block.appendChild(grid);
+    container.appendChild(block);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════════════════
+
+function exportCSV() {
+  const data = loadData();
+  const rows = ['date,pushups,goodDiet'];
+  Object.entries(data)
+    .sort(([a],[b]) => a.localeCompare(b))
+    .forEach(([date, rec]) => {
+      rows.push(`${date},${rec.pushups ?? ''},${rec.goodDiet ? 'true' : 'false'}`);
+    });
+  const blob = new Blob([rows.join('\n')], { type:'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `track_export_${todayKey()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function clearConfirm() {
+  if (confirm('Delete all data? This cannot be undone.')) {
+    localStorage.removeItem(STORE_KEY);
+    setCounter(10);
+    refreshUI();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Mouse wheel on counter
+  document.getElementById('counter-display').addEventListener('wheel', e => {
+    e.preventDefault();
+    setCounter(counterVal + (e.deltaY < 0 ? 1 : -1));
+  }, { passive: false });
+
+  refreshUI();
+  showNotifBannerIfNeeded();
+  registerSW();
+});
+</script>
+
+</body>
+</html>
