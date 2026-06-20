@@ -21,6 +21,7 @@
     --muted:     #666;
     --push:      #e8c84a;
     --diet:      #4ace82;
+    --run:       #e87a4a;
     --both:      #4aa8e8;
     --font-mono: 'Courier New', Courier, monospace;
     --font-disp: Georgia, 'Times New Roman', serif;
@@ -174,6 +175,11 @@
   #btn-diet:hover, #btn-diet.done { border-color: var(--diet); background: #001a0d; }
   #btn-diet.done .btn-value { color: var(--diet); }
   #btn-diet.done .btn-label { color: var(--diet); }
+
+  #btn-run { border-color: #2a1500; }
+  #btn-run:hover, #btn-run.done { border-color: var(--run); background: #1a0d00; }
+  #btn-run.done .btn-value { color: var(--run); }
+  #btn-run.done .btn-label { color: var(--run); }
 
   .log-btn::after {
     content: '✓ LOGGED';
@@ -331,6 +337,7 @@
   .cal-day.today { border-color: var(--muted); color: var(--text); }
   .cal-day.has-push { background: #1a1500; border-color: #3a3000; }
   .cal-day.has-diet { background: #001a0d; border-color: #003020; }
+  .cal-day.has-run  { background: #1a0d00; border-color: #3a2000; }
   .cal-day.has-both { background: #0d1a14; border-color: var(--both); }
 
   .cal-day .dots {
@@ -342,6 +349,7 @@
   .dot { width: 3px; height: 3px; border-radius: 50%; }
   .dot-push { background: var(--push); }
   .dot-diet { background: var(--diet); }
+  .dot-run  { background: var(--run);  }
 
   /* ── LEGEND ───────────────────────────────────── */
   .legend {
@@ -441,6 +449,15 @@
       </button>
     </div>
 
+    <!-- Run row -->
+    <div class="action-row">
+      <button class="log-btn" id="btn-run" onclick="logRun()">
+        <span class="btn-label">Run</span>
+        <span class="btn-value" id="btn-run-val">Ran today</span>
+        <span class="btn-sub">tap to record</span>
+      </button>
+    </div>
+
   </div>
 
   <!-- STATUS BAR -->
@@ -461,6 +478,9 @@
       </div>
       <div class="legend-item">
         <div class="legend-swatch" style="background:#003020;border:1px solid var(--diet)"></div>Diet
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:#1a0d00;border:1px solid var(--run)"></div>Run
       </div>
       <div class="legend-item">
         <div class="legend-swatch" style="background:#0d1a14;border:1px solid var(--both)"></div>Both
@@ -566,6 +586,15 @@ function logDiet() {
   refreshUI();
 }
 
+function logRun() {
+  const data = loadData();
+  const rec  = getOrCreateToday(data);
+  rec.ran = true;
+  saveData(data);
+  flash('btn-run');
+  refreshUI();
+}
+
 function flash(id) {
   const el = document.getElementById(id);
   el.classList.add('flashing');
@@ -579,11 +608,12 @@ function flash(id) {
 const NOTIF_DISMISSED_KEY = 'track_notif_dismissed';
 
 function updateNotifStatusUI() {
-  const granted = Notification.permission === 'granted';
-  const dot     = document.getElementById('notif-dot');
-  const label   = document.getElementById('notif-label');
+  const dot   = document.getElementById('notif-dot');
+  const label = document.getElementById('notif-label');
+  const supported = ('Notification' in window);
+  const granted = supported && Notification.permission === 'granted';
   dot.classList.toggle('on', granted);
-  label.textContent = granted ? '10pm on' : '10pm off';
+  label.textContent = !supported ? 'unsupported' : (granted ? '10pm on' : '10pm off');
 }
 
 function showNotifBannerIfNeeded() {
@@ -663,38 +693,51 @@ function refreshUI() {
   // Button done states
   const pushDone = today.pushups != null;
   const dietDone = today.goodDiet === true;
+  const ranDone  = today.ran === true;
 
   document.getElementById('btn-push').classList.toggle('done', pushDone);
   document.getElementById('btn-diet').classList.toggle('done', dietDone);
+  document.getElementById('btn-run').classList.toggle('done', ranDone);
 
   document.getElementById('btn-push').querySelector('.btn-sub').textContent =
     pushDone ? 'logged ✓' : 'tap to record';
   document.getElementById('btn-diet').querySelector('.btn-sub').textContent =
     dietDone ? 'logged ✓' : 'tap to record';
+  document.getElementById('btn-run').querySelector('.btn-sub').textContent =
+    ranDone  ? 'logged ✓' : 'tap to record';
 
   if (pushDone) {
     document.getElementById('btn-push-val').textContent = today.pushups;
     setCounter(today.pushups);
   }
 
-  // Status pill
+  // Status pill — summarise what's done today
   const statusEl = document.getElementById('status-text');
-  if (pushDone && dietDone) {
-    statusEl.className = 'status-pill';
-    statusEl.style.cssText = 'background:#0d1a14;color:var(--both);border:1px solid var(--both)';
-    statusEl.textContent = `${today.pushups} push-ups · good diet`;
-  } else if (pushDone) {
-    statusEl.className = 'status-pill pill-push';
-    statusEl.style.cssText = '';
-    statusEl.textContent = `${today.pushups} push-ups logged`;
-  } else if (dietDone) {
-    statusEl.className = 'status-pill pill-diet';
-    statusEl.style.cssText = '';
-    statusEl.textContent = 'Good diet logged';
-  } else {
+  const parts = [];
+  if (pushDone) parts.push(`${today.pushups} push-ups`);
+  if (dietDone) parts.push('good diet');
+  if (ranDone)  parts.push('ran');
+
+  if (parts.length === 0) {
     statusEl.className = 'pill-none';
     statusEl.style.cssText = '';
     statusEl.textContent = 'Nothing logged today';
+  } else if (parts.length >= 2) {
+    statusEl.className = 'status-pill';
+    statusEl.style.cssText = 'background:#0d1a14;color:var(--both);border:1px solid var(--both)';
+    statusEl.textContent = parts.join(' · ');
+  } else if (pushDone) {
+    statusEl.className = 'status-pill pill-push';
+    statusEl.style.cssText = '';
+    statusEl.textContent = parts[0];
+  } else if (dietDone) {
+    statusEl.className = 'status-pill pill-diet';
+    statusEl.style.cssText = '';
+    statusEl.textContent = parts[0];
+  } else {
+    statusEl.className = 'status-pill';
+    statusEl.style.cssText = 'background:#1a0d00;color:var(--run);border:1px solid #3a2000';
+    statusEl.textContent = 'Ran today';
   }
 
   updateNotifStatusUI();
@@ -763,12 +806,13 @@ function renderCalendar(data) {
       if (dateStr === todayStr)  cell.classList.add('today');
       if (rec.pushups != null)   cell.classList.add('has-push');
       if (rec.goodDiet)          cell.classList.add('has-diet');
+      if (rec.ran)               cell.classList.add('has-run');
       if (rec.pushups != null && rec.goodDiet) {
         cell.classList.remove('has-push', 'has-diet');
         cell.classList.add('has-both');
       }
 
-      if (rec.pushups != null || rec.goodDiet) {
+      if (rec.pushups != null || rec.goodDiet || rec.ran) {
         const dots = document.createElement('div');
         dots.className = 'dots';
         if (rec.pushups != null) {
@@ -779,6 +823,11 @@ function renderCalendar(data) {
         if (rec.goodDiet) {
           const dot = document.createElement('div');
           dot.className = 'dot dot-diet';
+          dots.appendChild(dot);
+        }
+        if (rec.ran) {
+          const dot = document.createElement('div');
+          dot.className = 'dot dot-run';
           dots.appendChild(dot);
         }
         cell.appendChild(dots);
@@ -798,11 +847,11 @@ function renderCalendar(data) {
 
 function exportCSV() {
   const data = loadData();
-  const rows = ['date,pushups,goodDiet'];
+  const rows = ['date,pushups,goodDiet,ran'];
   Object.entries(data)
     .sort(([a],[b]) => a.localeCompare(b))
     .forEach(([date, rec]) => {
-      rows.push(`${date},${rec.pushups ?? ''},${rec.goodDiet ? 'true' : 'false'}`);
+      rows.push(`${date},${rec.pushups ?? ''},${rec.goodDiet ? 'true' : 'false'},${rec.ran ? 'true' : 'false'}`);
     });
   const blob = new Blob([rows.join('\n')], { type:'text/csv' });
   const url  = URL.createObjectURL(blob);
