@@ -333,6 +333,12 @@
     cursor: default;
   }
 
+  .cal-day-clickable {
+    cursor: pointer;
+    transition: border-color 0.1s, transform 0.1s;
+  }
+  .cal-day-clickable:active { transform: scale(0.92); border-color: var(--text); }
+
   .cal-day.empty { background: transparent; border-color: transparent; }
   .cal-day.today { border-color: var(--muted); color: var(--text); }
   .cal-day.has-push { background: #1a1500; border-color: #3a3000; }
@@ -396,6 +402,143 @@
   #calendar-section::-webkit-scrollbar { width: 4px; }
   #calendar-section::-webkit-scrollbar-track { background: transparent; }
   #calendar-section::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── DAY EDITOR MODAL ─────────────────────────── */
+  #day-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 100;
+  }
+  #day-modal-backdrop.hidden { display: none; }
+
+  #day-modal {
+    width: 100%;
+    max-width: 480px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    padding: 18px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  #day-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  #day-modal-date {
+    font-family: var(--font-disp);
+    font-size: 18px;
+    color: var(--text);
+  }
+
+  #day-modal-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 6px;
+  }
+
+  #day-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .modal-field {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .modal-field-label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    width: 64px;
+    flex-shrink: 0;
+  }
+
+  .modal-field-control {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  #modal-counter-display {
+    width: 44px; height: 36px;
+    background: #0f0f0f;
+    border-top: 1.5px solid var(--border);
+    border-bottom: 1.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-disp);
+    font-size: 18px;
+    color: var(--push);
+  }
+
+  #modal-arrow-dn { border-radius: 3px 0 0 3px; width: 36px; height: 36px; }
+  #modal-arrow-up { border-radius: 0 3px 3px 0; width: 36px; height: 36px; }
+
+  .modal-toggle-btn {
+    flex: 1;
+    padding: 9px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    background: #0f0f0f;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .modal-toggle-btn.on-diet { color: var(--diet); border-color: var(--diet); background: #001a0d; }
+  .modal-toggle-btn.on-run  { color: var(--run);  border-color: var(--run);  background: #1a0d00; }
+  .modal-toggle-btn.on-push { color: var(--push); border-color: var(--push); background: #1a1500; }
+
+  #day-modal-footer {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  #modal-clear-btn, #modal-save-btn {
+    flex: 1;
+    padding: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  #modal-clear-btn {
+    background: transparent;
+    border: 1.5px solid var(--border);
+    color: var(--muted);
+  }
+
+  #modal-save-btn {
+    background: var(--text);
+    border: 1.5px solid var(--text);
+    color: #0a0a0a;
+    font-weight: bold;
+  }
 </style>
 </head>
 <body>
@@ -497,6 +640,52 @@
 
 </div>
 
+<!-- DAY EDITOR MODAL — for retrospective logging on past days -->
+<div id="day-modal-backdrop" class="hidden" onclick="closeDayEditorIfBackdrop(event)">
+  <div id="day-modal">
+    <div id="day-modal-header">
+      <span id="day-modal-date">—</span>
+      <button id="day-modal-close" onclick="closeDayEditor()">✕</button>
+    </div>
+
+    <div id="day-modal-body">
+
+      <!-- Push-ups -->
+      <div class="modal-field">
+        <div class="modal-field-label">Push-ups</div>
+        <div class="modal-field-control">
+          <div class="counter-arrow" id="modal-arrow-dn"
+               ontouchstart="modalStartRepeat(-1)" ontouchend="modalStopRepeat()"
+               onmousedown="modalStartRepeat(-1)"  onmouseup="modalStopRepeat()" onmouseleave="modalStopRepeat()">▼</div>
+          <div id="modal-counter-display">10</div>
+          <div class="counter-arrow" id="modal-arrow-up"
+               ontouchstart="modalStartRepeat(1)" ontouchend="modalStopRepeat()"
+               onmousedown="modalStartRepeat(1)"  onmouseup="modalStopRepeat()" onmouseleave="modalStopRepeat()">▲</div>
+        </div>
+        <button class="modal-toggle-btn" id="modal-push-toggle" onclick="modalTogglePush()">Not logged</button>
+      </div>
+
+      <!-- Diet -->
+      <div class="modal-field">
+        <div class="modal-field-label">Diet</div>
+        <button class="modal-toggle-btn" id="modal-diet-toggle" onclick="modalToggleDiet()">Not logged</button>
+      </div>
+
+      <!-- Run -->
+      <div class="modal-field">
+        <div class="modal-field-label">Run</div>
+        <button class="modal-toggle-btn" id="modal-run-toggle" onclick="modalToggleRun()">Not logged</button>
+      </div>
+
+    </div>
+
+    <div id="day-modal-footer">
+      <button id="modal-clear-btn" onclick="modalClearDay()">Clear day</button>
+      <button id="modal-save-btn" onclick="modalSaveDay()">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════
 //  DATA LAYER
@@ -595,6 +784,125 @@ function logRun() {
   refreshUI();
 }
 
+// ═══════════════════════════════════════════════════
+//  DAY EDITOR MODAL — retrospective logging on any day
+// ═══════════════════════════════════════════════════
+
+let modalDateStr   = null;  // which day is currently open
+let modalCounterVal = 10;
+let modalPushOn     = false;
+let modalDietOn     = false;
+let modalRunOn      = false;
+let modalRepeatTimer = null;
+
+function openDayEditor(dateStr) {
+  modalDateStr = dateStr;
+  const data = loadData();
+  const rec  = data[dateStr] || {};
+
+  modalPushOn = rec.pushups != null;
+  modalCounterVal = modalPushOn ? rec.pushups : 10;
+  modalDietOn = rec.goodDiet === true;
+  modalRunOn  = rec.ran === true;
+
+  // Date heading, e.g. "Tue 17 Jun"
+  const d = new Date(dateStr + 'T00:00:00');
+  document.getElementById('day-modal-date').textContent =
+    d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+
+  modalRenderCounter();
+  modalRenderToggles();
+
+  document.getElementById('day-modal-backdrop').classList.remove('hidden');
+}
+
+function closeDayEditor() {
+  document.getElementById('day-modal-backdrop').classList.add('hidden');
+  modalDateStr = null;
+  modalStopRepeat();
+}
+
+function closeDayEditorIfBackdrop(e) {
+  if (e.target.id === 'day-modal-backdrop') closeDayEditor();
+}
+
+function modalRenderCounter() {
+  document.getElementById('modal-counter-display').textContent = modalCounterVal;
+}
+
+function modalSetCounter(v) {
+  modalCounterVal = Math.min(MAX, Math.max(MIN, v));
+  modalRenderCounter();
+  // Adjusting the counter implies push-ups happened that day
+  if (!modalPushOn) { modalPushOn = true; modalRenderToggles(); }
+}
+
+function modalStartRepeat(dir) {
+  modalSetCounter(modalCounterVal + dir);
+  modalRepeatTimer = setInterval(() => modalSetCounter(modalCounterVal + dir), 120);
+}
+function modalStopRepeat() {
+  clearInterval(modalRepeatTimer);
+  modalRepeatTimer = null;
+}
+
+function modalTogglePush() {
+  modalPushOn = !modalPushOn;
+  modalRenderToggles();
+}
+function modalToggleDiet() {
+  modalDietOn = !modalDietOn;
+  modalRenderToggles();
+}
+function modalToggleRun() {
+  modalRunOn = !modalRunOn;
+  modalRenderToggles();
+}
+
+function modalRenderToggles() {
+  const pushBtn = document.getElementById('modal-push-toggle');
+  pushBtn.textContent = modalPushOn ? `${modalCounterVal} logged` : 'Not logged';
+  pushBtn.classList.toggle('on-push', modalPushOn);
+
+  const dietBtn = document.getElementById('modal-diet-toggle');
+  dietBtn.textContent = modalDietOn ? 'Logged' : 'Not logged';
+  dietBtn.classList.toggle('on-diet', modalDietOn);
+
+  const runBtn = document.getElementById('modal-run-toggle');
+  runBtn.textContent = modalRunOn ? 'Logged' : 'Not logged';
+  runBtn.classList.toggle('on-run', modalRunOn);
+}
+
+function modalSaveDay() {
+  if (!modalDateStr) return;
+  const data = loadData();
+
+  const hasAnything = modalPushOn || modalDietOn || modalRunOn;
+  if (!hasAnything) {
+    // Nothing toggled on — treat Save as a clear for cleanliness
+    delete data[modalDateStr];
+  } else {
+    data[modalDateStr] = {
+      pushups:  modalPushOn ? modalCounterVal : null,
+      goodDiet: modalDietOn,
+      ran:      modalRunOn
+    };
+  }
+
+  saveData(data);
+  closeDayEditor();
+  refreshUI();
+}
+
+function modalClearDay() {
+  if (!modalDateStr) return;
+  const data = loadData();
+  delete data[modalDateStr];
+  saveData(data);
+  closeDayEditor();
+  refreshUI();
+}
+
 function flash(id) {
   const el = document.getElementById(id);
   el.classList.add('flashing');
@@ -682,7 +990,7 @@ async function registerSW() {
 //  UI REFRESH
 // ═══════════════════════════════════════════════════
 
-function refreshUI() {
+function refreshUI(scrollCalendar = false) {
   const data  = loadData();
   const today = data[todayKey()] || {};
 
@@ -741,14 +1049,14 @@ function refreshUI() {
   }
 
   updateNotifStatusUI();
-  renderCalendar(data);
+  renderCalendar(data, scrollCalendar);
 }
 
 // ═══════════════════════════════════════════════════
 //  CALENDAR HEATMAP — last 6 months
 // ═══════════════════════════════════════════════════
 
-function renderCalendar(data) {
+function renderCalendar(data, scrollToCurrent = false) {
   const container = document.getElementById('cal-container');
   container.innerHTML = '';
 
@@ -764,6 +1072,8 @@ function renderCalendar(data) {
   months.forEach(({ year, month }) => {
     const block = document.createElement('div');
     block.className = 'month-block';
+    const isCurrentMonth = (year === today.getFullYear() && month === today.getMonth());
+    if (isCurrentMonth) block.id = 'current-month-block';
 
     const label = document.createElement('div');
     label.className = 'month-label';
@@ -800,8 +1110,10 @@ function renderCalendar(data) {
       const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const rec     = data[dateStr] || {};
       const cell    = document.createElement('div');
-      cell.className = 'cal-day';
+      cell.className = 'cal-day cal-day-clickable';
       cell.textContent = d;
+      cell.dataset.date = dateStr;
+      cell.onclick = () => openDayEditor(dateStr);
 
       if (dateStr === todayStr)  cell.classList.add('today');
       if (rec.pushups != null)   cell.classList.add('has-push');
@@ -839,6 +1151,15 @@ function renderCalendar(data) {
     block.appendChild(grid);
     container.appendChild(block);
   });
+
+  if (scrollToCurrent) {
+    const currentBlock = document.getElementById('current-month-block');
+    if (currentBlock) {
+      // 'start' aligns the month's top edge with the top of the scroll
+      // container, so today's month is the first thing visible.
+      currentBlock.scrollIntoView({ block: 'start', behavior: 'auto' });
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -881,7 +1202,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setCounter(counterVal + (e.deltaY < 0 ? 1 : -1));
   }, { passive: false });
 
-  refreshUI();
+  refreshUI(true);  // true = scroll calendar to current month on first load
   showNotifBannerIfNeeded();
   registerSW();
 });
